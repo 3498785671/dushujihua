@@ -85,10 +85,16 @@ interface StoreContextValue extends AppState {
 
 // ==================== 工具函数 ====================
 
-const generateId = (): string =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
+const generateId = (): string => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // 某些 WebView 环境 crypto.randomUUID 可能抛错，回退到时间戳方案
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}-${Math.random().toString(36).substring(2, 6)}`;
+};
 
 const nowISO = (): string => new Date().toISOString();
 
