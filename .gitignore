@@ -1,0 +1,31 @@
+# 助手内部记录
+.workbuddy/
+
+# 依赖
+node_modules/
+server/node_modules/
+
+# 构建产物
+dist/
+android/
+*.apk
+
+# 数据库（含用户数据，勿提交）
+server/data.sqlite
+server/data.sqlite-wal
+server/data.sqlite-shm
+*.sqlite
+*.sqlite-*
+
+# 环境与缓存
+.env
+.npm-cache-fresh/
+npm_install_log.txt
+*.tsbuildinfo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 临时
+*.log

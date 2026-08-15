@@ -1,0 +1,10 @@
+node_modules
+dist
+server/node_modules
+server/data.sqlite
+server/data.sqlite-*
+.android
+android
+.git
+*.tsbuildinfo
+overview.md

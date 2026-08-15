@@ -1,0 +1,14 @@
+{
+  "name": "dushu-plan-server",
+  "version": "1.0.0",
+  "description": "独属计划 - 后端服务（Node 内置模块，零第三方依赖）",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  }
+}
