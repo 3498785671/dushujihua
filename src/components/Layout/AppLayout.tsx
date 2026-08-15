@@ -26,7 +26,6 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
-import LogoutIcon from '@mui/icons-material/Logout';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useStore } from '../../store/useStore';
@@ -45,18 +44,13 @@ export default function AppLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
   const navigate = useNavigate();
-  const { themeMode, toggleTheme, notification, closeNotification, user, logout } = useStore();
+  const { themeMode, toggleTheme, notification, closeNotification } = useStore();
 
   // 当前激活的底部导航索引
   const currentNavIndex = Math.max(
     0,
     BOTTOM_NAV_ITEMS.findIndex((item) => item.path === location.pathname)
   );
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -103,16 +97,8 @@ export default function AppLayout() {
               <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
                 独属计划
               </Typography>
-              {user && (
-                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
-                  {user.username}
-                </Typography>
-              )}
               <IconButton onClick={toggleTheme} color="inherit">
                 {themeMode === 'light' ? <Brightness4Icon /> : <Brightness7Icon />}
-              </IconButton>
-              <IconButton onClick={handleLogout} color="inherit" title="退出登录">
-                <LogoutIcon />
               </IconButton>
             </Toolbar>
           </AppBar>

@@ -1,6 +1,6 @@
 /**
  * 侧边导航栏（毛玻璃）
- * 桌面端使用，展示应用 logo、导航菜单、用户信息与退出
+ * 桌面端使用，展示应用 logo、导航菜单、主题切换
  */
 
 import {
@@ -10,10 +10,8 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
-  IconButton,
   Divider,
   Tooltip,
-  Avatar,
 } from '@mui/material';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -22,8 +20,7 @@ import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
-import LogoutIcon from '@mui/icons-material/Logout';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 
 const NAV_ITEMS = [
@@ -35,13 +32,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-  const { themeMode, toggleTheme, user, logout } = useStore();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
+  const { themeMode, toggleTheme } = useStore();
 
   return (
     <Box
@@ -119,33 +110,8 @@ export default function Sidebar() {
 
       <Divider />
 
-      {/* 底部：用户信息 + 主题切换 + 退出 */}
+      {/* 底部：主题切换 */}
       <Box sx={{ p: 1.5 }}>
-        {user && (
-          <Box
-            sx={{
-              px: 1,
-              py: 1,
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.25,
-              borderRadius: 2,
-            }}
-          >
-            <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: '0.9rem' }}>
-              {user.username.charAt(0).toUpperCase()}
-            </Avatar>
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>
-                {user.username}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                我的专属计划
-              </Typography>
-            </Box>
-          </Box>
-        )}
         <Tooltip title={themeMode === 'light' ? '切换到暗色模式' : '切换到亮色模式'}>
           <ListItemButton onClick={toggleTheme} sx={{ borderRadius: 2, minHeight: 44 }}>
             <ListItemIcon sx={{ minWidth: 40, justifyContent: 'center' }}>
@@ -157,12 +123,6 @@ export default function Sidebar() {
             />
           </ListItemButton>
         </Tooltip>
-        <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2, minHeight: 44 }}>
-          <ListItemIcon sx={{ minWidth: 40, justifyContent: 'center' }}>
-            <LogoutIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="退出登录" primaryTypographyProps={{ fontWeight: 500 }} />
-        </ListItemButton>
       </Box>
     </Box>
   );

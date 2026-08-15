@@ -1,8 +1,7 @@
 /**
- * 全局状态管理
- * - 认证：用户登录/注册/退出，token 持久化
- * - 数据：任务/计划/标签/每日记录，登录后从后端加载，增删改同步后端
- * - 主题与通知
+ * 全局状态管理（单机版）
+ * 数据本地持久化（localStorage），无后端、无登录
+ * 主题 + 通知
  */
 
 import React, {
@@ -26,9 +25,7 @@ import type {
   DailyRecordFormData,
   ThemeMode,
   SnackbarSeverity,
-  User,
 } from '../types';
-import { api, setAuthToken } from '../api/client';
 import { storage } from '../utils/storage';
 
 // ==================== 类型定义 ====================
@@ -40,8 +37,6 @@ interface AppNotification {
 }
 
 interface AppState {
-  user: User | null;
-  authLoading: boolean;
   tasks: Task[];
   plans: Plan[];
   tags: Tag[];
@@ -51,10 +46,6 @@ interface AppState {
 }
 
 type Action =
-  // 认证
-  | { type: 'SET_USER'; payload: User | null }
-  | { type: 'SET_AUTH_LOADING'; payload: boolean }
-  // 数据
   | { type: 'LOAD_STATE'; payload: { tasks: Task[]; plans: Plan[]; tags: Tag[]; dailyRecords: DailyRecord[] } }
   | { type: 'ADD_TASK'; payload: Task }
   | { type: 'UPDATE_TASK'; payload: Task }
@@ -68,62 +59,53 @@ type Action =
   | { type: 'ADD_DAILY_RECORD'; payload: DailyRecord }
   | { type: 'UPDATE_DAILY_RECORD'; payload: DailyRecord }
   | { type: 'DELETE_DAILY_RECORD'; payload: string }
-  // 主题
   | { type: 'TOGGLE_THEME' }
-  // 通知
   | { type: 'SHOW_NOTIFICATION'; payload: AppNotification }
   | { type: 'HIDE_NOTIFICATION' };
 
 interface StoreContextValue extends AppState {
-  // 认证
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-  // Task
-  addTask: (data: TaskFormData) => Promise<void>;
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
-  deleteTask: (id: string) => Promise<void>;
-  toggleTaskStatus: (id: string) => Promise<void>;
-  // Plan
-  addPlan: (data: PlanFormData) => Promise<void>;
-  updatePlan: (id: string, updates: Partial<Plan>) => Promise<void>;
-  deletePlan: (id: string) => Promise<void>;
-  // Tag
-  addTag: (data: TagFormData) => Promise<void>;
-  updateTag: (id: string, updates: Partial<Tag>) => Promise<void>;
-  deleteTag: (id: string) => Promise<void>;
-  // DailyRecord
-  addDailyRecord: (data: DailyRecordFormData) => Promise<void>;
-  updateDailyRecord: (id: string, updates: Partial<DailyRecord>) => Promise<void>;
-  deleteDailyRecord: (id: string) => Promise<void>;
+  addTask: (data: TaskFormData) => void;
+  updateTask: (id: string, updates: Partial<Task>) => void;
+  deleteTask: (id: string) => void;
+  toggleTaskStatus: (id: string) => void;
+  addPlan: (data: PlanFormData) => void;
+  updatePlan: (id: string, updates: Partial<Plan>) => void;
+  deletePlan: (id: string) => void;
+  addTag: (data: TagFormData) => void;
+  updateTag: (id: string, updates: Partial<Tag>) => void;
+  deleteTag: (id: string) => void;
+  addDailyRecord: (data: DailyRecordFormData) => void;
+  updateDailyRecord: (id: string, updates: Partial<DailyRecord>) => void;
+  deleteDailyRecord: (id: string) => void;
   getDailyRecordByDate: (date: string) => DailyRecord | undefined;
-  // Theme
   toggleTheme: () => void;
-  // Notification
   notify: (message: string, severity?: SnackbarSeverity) => void;
   closeNotification: () => void;
 }
 
 // ==================== 工具函数 ====================
 
-/** 生成唯一 ID */
 const generateId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
 
-/** 获取当前 ISO 时间戳 */
 const nowISO = (): string => new Date().toISOString();
 
-const TOKEN_KEY = 'dushu_plan_token';
-const THEME_KEY = 'dushu_plan_theme';
+const STORAGE_KEY = 'app_state';
+const THEME_KEY = 'theme';
+
+const defaultTags: Tag[] = [
+  { id: 'tag-default-work', name: '工作', color: '#3b82f6', createdAt: nowISO() },
+  { id: 'tag-default-life', name: '生活', color: '#22c55e', createdAt: nowISO() },
+  { id: 'tag-default-study', name: '学习', color: '#8b5cf6', createdAt: nowISO() },
+  { id: 'tag-default-health', name: '健康', color: '#ef4444', createdAt: nowISO() },
+];
 
 const initialState: AppState = {
-  user: null,
-  authLoading: true,
   tasks: [],
   plans: [],
-  tags: [],
+  tags: defaultTags,
   dailyRecords: [],
   themeMode: storage.get<ThemeMode>(THEME_KEY, 'light'),
   notification: null,
@@ -133,17 +115,9 @@ const initialState: AppState = {
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    // 认证
-    case 'SET_USER':
-      return { ...state, user: action.payload };
-    case 'SET_AUTH_LOADING':
-      return { ...state, authLoading: action.payload };
-
-    // 数据加载
     case 'LOAD_STATE':
       return { ...state, ...action.payload };
 
-    // Task
     case 'ADD_TASK':
       return { ...state, tasks: [...state.tasks, action.payload] };
     case 'UPDATE_TASK':
@@ -154,7 +128,6 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_TASK':
       return { ...state, tasks: state.tasks.filter((t) => t.id !== action.payload) };
 
-    // Plan
     case 'ADD_PLAN':
       return { ...state, plans: [...state.plans, action.payload] };
     case 'UPDATE_PLAN':
@@ -169,7 +142,6 @@ function reducer(state: AppState, action: Action): AppState {
         tasks: state.tasks.map((t) => (t.planId === action.payload ? { ...t, planId: undefined } : t)),
       };
 
-    // Tag
     case 'ADD_TAG':
       return { ...state, tags: [...state.tags, action.payload] };
     case 'UPDATE_TAG':
@@ -188,7 +160,6 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       };
 
-    // DailyRecord
     case 'ADD_DAILY_RECORD':
       return { ...state, dailyRecords: [...state.dailyRecords, action.payload] };
     case 'UPDATE_DAILY_RECORD':
@@ -204,11 +175,9 @@ function reducer(state: AppState, action: Action): AppState {
         dailyRecords: state.dailyRecords.filter((r) => r.id !== action.payload),
       };
 
-    // 主题
     case 'TOGGLE_THEME':
       return { ...state, themeMode: state.themeMode === 'light' ? 'dark' : 'light' };
 
-    // 通知
     case 'SHOW_NOTIFICATION':
       return { ...state, notification: action.payload };
     case 'HIDE_NOTIFICATION':
@@ -226,14 +195,27 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 // ==================== Provider ====================
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState, (init) => {
+    const saved = storage.get<Partial<AppState>>(STORAGE_KEY, {});
+    return {
+      ...init,
+      ...saved,
+      notification: null,
+      tags: saved.tags && saved.tags.length > 0 ? saved.tags : init.tags,
+    };
+  });
+
+  // 数据持久化到 localStorage
+  useEffect(() => {
+    const { notification, ...persist } = state;
+    storage.set(STORAGE_KEY, persist);
+  }, [state]);
 
   // 主题持久化
   useEffect(() => {
     storage.set(THEME_KEY, state.themeMode);
   }, [state.themeMode]);
 
-  // 通知
   const notify = useCallback((message: string, severity: SnackbarSeverity = 'success'): void => {
     dispatch({ type: 'SHOW_NOTIFICATION', payload: { key: Date.now(), message, severity } });
   }, []);
@@ -242,79 +224,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'HIDE_NOTIFICATION' });
   }, []);
 
-  /** 统一错误处理 */
-  const handleError = useCallback(
-    (err: unknown): void => {
-      const message = err instanceof Error ? err.message : '操作失败，请稍后重试';
-      notify(message, 'error');
-    },
-    [notify]
-  );
-
-  // 初始认证检查：恢复 token 并加载数据
-  useEffect(() => {
-    const token = storage.get<string | null>(TOKEN_KEY, null);
-    if (!token) {
-      dispatch({ type: 'SET_AUTH_LOADING', payload: false });
-      return;
-    }
-    setAuthToken(token);
-    (async () => {
-      try {
-        const { user } = await api.me();
-        dispatch({ type: 'SET_USER', payload: user });
-        const data = await api.getData();
-        dispatch({ type: 'LOAD_STATE', payload: data });
-      } catch {
-        setAuthToken(null);
-        storage.remove(TOKEN_KEY);
-        dispatch({ type: 'SET_USER', payload: null });
-      } finally {
-        dispatch({ type: 'SET_AUTH_LOADING', payload: false });
-      }
-    })();
-  }, []);
-
-  /** 认证成功后的通用流程 */
-  const applyAuth = useCallback(async (token: string, user: User): Promise<void> => {
-    setAuthToken(token);
-    storage.set(TOKEN_KEY, token);
-    dispatch({ type: 'SET_USER', payload: user });
-    const data = await api.getData();
-    dispatch({ type: 'LOAD_STATE', payload: data });
-  }, []);
-
-  const login = useCallback(
-    async (username: string, password: string): Promise<void> => {
-      const { token, user } = await api.login(username, password);
-      await applyAuth(token, user);
-    },
-    [applyAuth]
-  );
-
-  const register = useCallback(
-    async (username: string, password: string): Promise<void> => {
-      const { token, user } = await api.register(username, password);
-      await applyAuth(token, user);
-    },
-    [applyAuth]
-  );
-
-  const logout = useCallback((): void => {
-    setAuthToken(null);
-    storage.remove(TOKEN_KEY);
-    dispatch({ type: 'SET_USER', payload: null });
-    dispatch({
-      type: 'LOAD_STATE',
-      payload: { tasks: [], plans: [], tags: [], dailyRecords: [] },
-    });
-  }, []);
-
   // ---------- Task ----------
   const addTask = useCallback(
-    async (data: TaskFormData): Promise<void> => {
+    (data: TaskFormData): void => {
       const now = nowISO();
-      const task: Partial<Task> = {
+      const task: Task = {
         id: generateId(),
         title: data.title,
         description: data.description,
@@ -326,65 +240,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         order: Date.now(),
         createdAt: now,
         updatedAt: now,
+        ...(data.status === 'done' ? { completedAt: now } : {}),
       };
-      try {
-        const created = await api.createTask(task);
-        dispatch({ type: 'ADD_TASK', payload: created });
-        notify('任务已创建');
-      } catch (err) {
-        handleError(err);
-      }
+      dispatch({ type: 'ADD_TASK', payload: task });
+      notify('任务已创建');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const updateTask = useCallback(
-    async (id: string, updates: Partial<Task>): Promise<void> => {
-      try {
-        const updated = await api.updateTask(id, updates);
-        dispatch({ type: 'UPDATE_TASK', payload: updated });
-        notify('任务已更新');
-      } catch (err) {
-        handleError(err);
+    (id: string, updates: Partial<Task>): void => {
+      const current = state.tasks.find((t) => t.id === id);
+      if (!current) return;
+      const merged: Task = { ...current, ...updates, updatedAt: nowISO() };
+      if (updates.status === 'done') {
+        merged.completedAt = nowISO();
+      } else if (updates.status) {
+        merged.completedAt = undefined;
       }
+      dispatch({ type: 'UPDATE_TASK', payload: merged });
+      notify('任务已更新');
     },
-    [notify, handleError]
+    [state.tasks, notify]
   );
 
   const deleteTask = useCallback(
-    async (id: string): Promise<void> => {
-      try {
-        await api.deleteTask(id);
-        dispatch({ type: 'DELETE_TASK', payload: id });
-        notify('任务已删除');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string): void => {
+      dispatch({ type: 'DELETE_TASK', payload: id });
+      notify('任务已删除');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const toggleTaskStatus = useCallback(
-    async (id: string): Promise<void> => {
+    (id: string): void => {
       const task = state.tasks.find((t) => t.id === id);
       if (!task) return;
       const nextStatus: TaskStatus =
         task.status === 'todo' ? 'inProgress' : task.status === 'inProgress' ? 'done' : 'todo';
-      try {
-        const updated = await api.updateTask(id, { status: nextStatus });
-        dispatch({ type: 'UPDATE_TASK', payload: updated });
-      } catch (err) {
-        handleError(err);
-      }
+      const merged: Task = {
+        ...task,
+        status: nextStatus,
+        updatedAt: nowISO(),
+        completedAt: nextStatus === 'done' ? nowISO() : undefined,
+      };
+      dispatch({ type: 'UPDATE_TASK', payload: merged });
     },
-    [state.tasks, handleError]
+    [state.tasks]
   );
 
   // ---------- Plan ----------
   const addPlan = useCallback(
-    async (data: PlanFormData): Promise<void> => {
+    (data: PlanFormData): void => {
       const now = nowISO();
-      const plan: Partial<Plan> = {
+      const plan: Plan = {
         id: generateId(),
         title: data.title,
         description: data.description,
@@ -396,94 +305,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         createdAt: now,
         updatedAt: now,
       };
-      try {
-        const created = await api.createPlan(plan);
-        dispatch({ type: 'ADD_PLAN', payload: created });
-        notify('计划已创建');
-      } catch (err) {
-        handleError(err);
-      }
+      dispatch({ type: 'ADD_PLAN', payload: plan });
+      notify('计划已创建');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const updatePlan = useCallback(
-    async (id: string, updates: Partial<Plan>): Promise<void> => {
-      try {
-        const updated = await api.updatePlan(id, updates);
-        dispatch({ type: 'UPDATE_PLAN', payload: updated });
-        notify('计划已更新');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string, updates: Partial<Plan>): void => {
+      const current = state.plans.find((p) => p.id === id);
+      if (!current) return;
+      dispatch({ type: 'UPDATE_PLAN', payload: { ...current, ...updates, updatedAt: nowISO() } });
+      notify('计划已更新');
     },
-    [notify, handleError]
+    [state.plans, notify]
   );
 
   const deletePlan = useCallback(
-    async (id: string): Promise<void> => {
-      try {
-        await api.deletePlan(id);
-        dispatch({ type: 'DELETE_PLAN', payload: id });
-        notify('计划已删除');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string): void => {
+      dispatch({ type: 'DELETE_PLAN', payload: id });
+      notify('计划已删除');
     },
-    [notify, handleError]
+    [notify]
   );
 
   // ---------- Tag ----------
   const addTag = useCallback(
-    async (data: TagFormData): Promise<void> => {
-      const tag: Partial<Tag> = {
-        id: generateId(),
-        name: data.name,
-        color: data.color,
-        createdAt: nowISO(),
-      };
-      try {
-        const created = await api.createTag(tag);
-        dispatch({ type: 'ADD_TAG', payload: created });
-        notify('标签已创建');
-      } catch (err) {
-        handleError(err);
-      }
+    (data: TagFormData): void => {
+      const tag: Tag = { id: generateId(), name: data.name, color: data.color, createdAt: nowISO() };
+      dispatch({ type: 'ADD_TAG', payload: tag });
+      notify('标签已创建');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const updateTag = useCallback(
-    async (id: string, updates: Partial<Tag>): Promise<void> => {
-      try {
-        const updated = await api.updateTag(id, updates);
-        dispatch({ type: 'UPDATE_TAG', payload: updated });
-        notify('标签已更新');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string, updates: Partial<Tag>): void => {
+      const current = state.tags.find((t) => t.id === id);
+      if (!current) return;
+      dispatch({ type: 'UPDATE_TAG', payload: { ...current, ...updates } });
+      notify('标签已更新');
     },
-    [notify, handleError]
+    [state.tags, notify]
   );
 
   const deleteTag = useCallback(
-    async (id: string): Promise<void> => {
-      try {
-        await api.deleteTag(id);
-        dispatch({ type: 'DELETE_TAG', payload: id });
-        notify('标签已删除');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string): void => {
+      dispatch({ type: 'DELETE_TAG', payload: id });
+      notify('标签已删除');
     },
-    [notify, handleError]
+    [notify]
   );
 
   // ---------- DailyRecord ----------
   const addDailyRecord = useCallback(
-    async (data: DailyRecordFormData): Promise<void> => {
+    (data: DailyRecordFormData): void => {
       const now = nowISO();
-      const record: Partial<DailyRecord> = {
+      const record: DailyRecord = {
         id: generateId(),
         date: data.date,
         notes: data.notes,
@@ -491,41 +369,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         createdAt: now,
         updatedAt: now,
       };
-      try {
-        const created = await api.createRecord(record);
-        dispatch({ type: 'ADD_DAILY_RECORD', payload: created });
-        notify('记录已保存');
-      } catch (err) {
-        handleError(err);
-      }
+      dispatch({ type: 'ADD_DAILY_RECORD', payload: record });
+      notify('记录已保存');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const updateDailyRecord = useCallback(
-    async (id: string, updates: Partial<DailyRecord>): Promise<void> => {
-      try {
-        const updated = await api.updateRecord(id, updates);
-        dispatch({ type: 'UPDATE_DAILY_RECORD', payload: updated });
-        notify('记录已更新');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string, updates: Partial<DailyRecord>): void => {
+      const current = state.dailyRecords.find((r) => r.id === id);
+      if (!current) return;
+      dispatch({
+        type: 'UPDATE_DAILY_RECORD',
+        payload: { ...current, ...updates, updatedAt: nowISO() },
+      });
+      notify('记录已更新');
     },
-    [notify, handleError]
+    [state.dailyRecords, notify]
   );
 
   const deleteDailyRecord = useCallback(
-    async (id: string): Promise<void> => {
-      try {
-        await api.deleteRecord(id);
-        dispatch({ type: 'DELETE_DAILY_RECORD', payload: id });
-        notify('记录已删除');
-      } catch (err) {
-        handleError(err);
-      }
+    (id: string): void => {
+      dispatch({ type: 'DELETE_DAILY_RECORD', payload: id });
+      notify('记录已删除');
     },
-    [notify, handleError]
+    [notify]
   );
 
   const getDailyRecordByDate = useCallback(
@@ -533,7 +401,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [state.dailyRecords]
   );
 
-  // ---------- Theme ----------
   const toggleTheme = useCallback((): void => {
     dispatch({ type: 'TOGGLE_THEME' });
   }, []);
@@ -541,9 +408,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo<StoreContextValue>(
     () => ({
       ...state,
-      login,
-      register,
-      logout,
       addTask,
       updateTask,
       deleteTask,
@@ -564,9 +428,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
-      login,
-      register,
-      logout,
       addTask,
       updateTask,
       deleteTask,
@@ -592,7 +453,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
 // ==================== Hook ====================
 
-/** 获取全局 Store */
 export function useStore(): StoreContextValue {
   const ctx = useContext(StoreContext);
   if (!ctx) {

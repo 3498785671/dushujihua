@@ -8,3 +8,6 @@ android
 .git
 *.tsbuildinfo
 overview.md
+.npm-cache-fresh
+*.apk
+OpenJDK21.zip

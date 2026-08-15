@@ -26,12 +26,6 @@ export type ThemeMode = 'light' | 'dark';
 /** 通知严重级别 */
 export type SnackbarSeverity = 'success' | 'error' | 'info' | 'warning';
 
-/** 用户 */
-export interface User {
-  id: string;
-  username: string;
-}
-
 // ==================== 核心数据模型 ====================
 
 /** 任务 */
