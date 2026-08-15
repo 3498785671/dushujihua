@@ -36,12 +36,12 @@ export const createAppTheme = (mode: 'light' | 'dark'): Theme => {
       info: { main: '#3b82f6', light: '#60a5fa', dark: '#2563eb' },
       ...(isLight
         ? {
-            background: { default: 'transparent', paper: 'transparent' },
+            background: { default: 'rgba(0,0,0,0)', paper: 'rgba(0,0,0,0)' },
             text: { primary: '#1e293b', secondary: '#64748b' },
             divider: 'rgba(100,116,139,0.18)',
           }
         : {
-            background: { default: 'transparent', paper: 'transparent' },
+            background: { default: 'rgba(0,0,0,0)', paper: 'rgba(0,0,0,0)' },
             text: { primary: '#f1f5f9', secondary: '#94a3b8' },
             divider: 'rgba(148,163,184,0.16)',
           }),
